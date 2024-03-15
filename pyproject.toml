@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "ocr_service"
+version = "0.1.0"
+description = "ocr web"
+authors = ["mychen76 <mychen76@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "~3.10"
+paddlepaddle = "^2.6.0"
+paddleocr = "^2.7.0"
+streamlit = "^1.30.0"
+svgtrace = "^2024"
+CairoSVG = "^2.7.1"
+fpdf2 = "^2.7.7"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

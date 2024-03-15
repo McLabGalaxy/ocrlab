@@ -1,0 +1,182 @@
+import os
+import cv2
+import numpy as np
+from paddleocr import PaddleOCR, draw_ocr
+import streamlit as st
+from PIL import Image
+
+FONT = 'fonts/simfang.ttf'
+
+# Streamlit app
+st.title("eReceipt-Lab: OCR to Text")
+
+# Language selection dropdown menu
+# Paddleocr supports Chinese, English, French, German, Korean and Japanese.
+# You can set the parameter `lang` as `ch`, `en`, `french`, `german`, `korean`, `japan`
+# https://raw.githubusercontent.com/Mushroomcat9998/PaddleOCR/main/doc/doc_en/multi_languages_en.md
+# to switch the language model in order.
+# Add more languages if needed
+language = st.sidebar.selectbox("Select Language", ["English", "Japanese", "German", "Chinese","Korean"])
+
+if language == "Japan":
+    language_code = "japan"
+elif language == "French":
+    language_code = "fr"
+elif language == "Chinese":
+    language_code = "cr"
+elif language == "German":
+    language_code = "german"    
+elif language == "English":
+    language_code = "en"
+elif language =="Spanish":
+    language_code = "es"
+
+
+_ENABLE_USER_GPU = False
+# require 
+# !python -m pip install paddlepaddle-gpu==2.0.0 -i https://mirror.baidu.com/pypi/simple
+#
+# classification and detection
+# det=False, cls=False
+
+# Initialize PaddleOCR
+ocr = PaddleOCR(use_angle_cls=True, lang=language_code,use_gpu=_ENABLE_USER_GPU)
+
+def load_upload_image(upload_file:str=None):
+    # Load the image
+    file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+    image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert image to RGB color space        
+    return image
+
+def ocr_image(image=None,image_url:str=None):
+    if image is None and image_url is None:
+        raise ValueError("missing input file or url")
+    if image is not None:
+        results = ocr.ocr(image, cls=True)  
+    elif image_url:
+        results = ocr.ocr(image_url, cls=True)                
+    return results
+
+    
+# input image url
+input_img_url = 'http://n.sinaimg.cn/ent/transform/w630h933/20171222/o111-fypvuqf1838418.jpg'
+
+input_img_url = st.text_input('Enter a receipt image url', 'http://n.sinaimg.cn/ent/transform/w630h933/20171222/o111-fypvuqf1838418.jpg')
+#st.write('you entered url:', title)
+if input_img_url:
+    st.write("You entered: ", input_img_url)
+    retrived_image=st.image(input_img_url, caption="Uploaded Receipt Image", use_column_width=True)
+    
+    # Perform OCR on the image
+    with st.spinner("Working on OCR...one moment. please!"):
+        #results = ocr.ocr(image, cls=True)
+        results = ocr_image(input_img_url)
+    
+    # Display the OCR result image    
+    st.subheader("OCR Detected Result")
+    result = results[0]
+    boxes = [line[0] for line in result]
+    txts = [line[1][0] for line in result]
+    scores = [line[1][1] for line in result] 
+
+    im_show = draw_ocr(retrived_image, boxes, txts, scores, font_path=FONT)
+    st.image(im_show)       
+    
+    # show result text
+    result_text=[]
+    for idx in range(len(results)):
+        res = results[idx]
+        for line in res:
+            #print(line)
+            result_text.append(str(line))
+
+    ocr_txt = st.text_area("OCR Result Text",result_text)
+    st.write(f'total {len(ocr_txt)} characters.')
+    print(ocr_txt)
+
+
+# Upload image
+uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+
+st.divider()
+
+if uploaded_file is not None:
+    # Load the image
+    # file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+    # image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+    # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert image to RGB color space
+    image=load_upload_image(uploaded_file)
+    # Display the uploaded image
+    st.image(image, caption="Uploaded Receipt Image", use_column_width=True)
+    # Perform OCR on the image
+    with st.spinner("Working on OCR...one moment. please!"):
+        results = ocr_image(image)
+    
+    # Display the OCR result image
+    st.subheader("OCR Detected Result")
+    result = results[0]
+    boxes = [line[0] for line in result]
+    txts = [line[1][0] for line in result]
+    scores = [line[1][1] for line in result]
+
+    im_show = draw_ocr(image, boxes, txts, scores, font_path=FONT)
+    st.image(im_show)
+
+    ## save annotated-image
+    im_filename = "result/ocr_result.jpg"
+    im_show = Image.fromarray(im_show)
+    im_show.save(im_filename)
+
+    ## show image download button
+    with open(im_filename, "rb") as file:
+        st.download_button(
+            label="Download annotated image",data=im_filename,file_name=im_filename,
+            mime='image/png')
+
+    # show result text
+    # st.subheader("OCR Text")    
+    result_text=[]
+    for idx in range(len(results)):
+        res = results[idx]
+        for line in res:
+            #print(line)
+            result_text.append(str(line))
+
+    ocr_txt = st.text_area("OCR Result Text",result_text)
+    st.write(f'total {len(ocr_txt)} characters.')
+    print(ocr_txt)
+    
+    ## save ocr result text
+    im_text_file = "result/ocr_result.txt"
+    with open(im_text_file, "w", encoding="utf-8") as file:
+        file.write(ocr_txt)
+    ## show text file download button
+    with open(im_filename, "rb") as file:
+        st.download_button(
+            label="Download result text",data=im_text_file,file_name=im_text_file,
+            mime='text/txt')        
+
+    # # Define the information in the badge that we want to extract
+    # relevant_information = ["Invoice #:", "Account #","Total:"]
+    
+    # # extract information from result
+    # j = 0
+    # boxes, texts, scores = [], [], []
+    # for i, res in enumerate(results[0]):
+    #     if i not in [1, 4, 6, 11, 13, 15]:
+    #         continue
+    #     boxes.append(res[0])
+    #     if j == 3:
+    #         texts.append(relevant_information[j] + " " + res[1][0]) # remove DEUTSCH at the end
+    #     else:
+    #         texts.append(relevant_information[j] + " " + res[1][0])
+    #     scores.append(res[1][1])
+    #     j += 1  
+    
+    # #font_path = os.path.join('PaddleOCR', 'doc', 'fonts', 'latin.ttf')
+    # # draw annotations on image
+    # annotated_image = draw_ocr(image, boxes, texts, scores, font_path=FONT)
+    # st.image(annotated_image)
+    
+    
